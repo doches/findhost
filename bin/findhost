@@ -1,0 +1,65 @@
+#!/usr/bin/env ruby
+#
+# Findhost
+#
+# Usage: #{$0}
+
+require 'rubygems'
+require 'net/ssh'
+require 'highline/import'
+
+def die(message)
+  STDERR.puts message
+  exit(1)
+end
+
+user = HighLine.new
+username = user.ask("Username: ") { |q| q.default = ENV['USER'] }
+password = user.ask("Password: ")
+
+known_hosts = File.join("#{ENV['HOME']}",".ssh","known_hosts")
+die "#{known_hosts} not found" if not File.exists?(known_hosts)
+
+threads = []
+response = {}
+IO.foreach(known_hosts) do |line|
+  hostname, cruft = *line.split(',',2)
+  threads << Thread.new(hostname) do |host|
+    response[host] = `ping -W 1 -c 5 #{host} 2> /dev/null`
+  end
+  break if hostname == "staff.compute"
+end
+STDERR.print "Pinging..."
+threads.each { |x| x.join }
+STDERR.puts "OK"
+
+invalid = []
+response.each_pair do |host,resp|
+  valid = false
+  resp.split("\n").each do |line|
+    if line =~ /round\-trip.*(\d+\.\d+)\/(\d+\.\d+)\/(\d+\.\d+)\/(\d+\.\d+)/
+      response[host] = $3.to_f
+      valid = true
+    end
+  end
+  invalid.push host if not valid
+end
+
+response.reject! { |k,v| invalid.include?(k) }
+
+STDERR.print "Authenticating #{response.size} hosts..."
+response.map do |host, ping|
+  begin
+    Net::SSH.start(host, username, :password => password) do |ssh|
+      
+    end
+  rescue
+    # SSH failed
+    response[host] = false
+  end
+end
+response.reject! { |k,v| v == false }
+STDERR.puts "OK"
+
+STDERR.puts "\n"
+puts response.map { |k,v| [k,v] }.sort { |a,b| a[1] <=> b[1] }.map { |x| x.join("\t") }.join("\n")
