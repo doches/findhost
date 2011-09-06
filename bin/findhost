@@ -15,21 +15,24 @@ end
 
 user = HighLine.new
 username = user.ask("Username: ") { |q| q.default = ENV['USER'] }
-password = user.ask("Password: ")
+password = user.ask("Password: ") { |q| q.echo = false }
 
 known_hosts = File.join("#{ENV['HOME']}",".ssh","known_hosts")
 die "#{known_hosts} not found" if not File.exists?(known_hosts)
 
+hosts = []
 threads = []
 response = {}
 IO.foreach(known_hosts) do |line|
-  hostname, cruft = *line.split(',',2)
+  hostname = line.split(/[\, ]/).shift
+  hosts.push hostname
+end
+STDERR.print "Pinging #{hosts.size} hosts..."
+hosts.each do |hostname|
   threads << Thread.new(hostname) do |host|
     response[host] = `ping -W 1 -c 5 #{host} 2> /dev/null`
   end
-  break if hostname == "staff.compute"
 end
-STDERR.print "Pinging..."
 threads.each { |x| x.join }
 STDERR.puts "OK"
 
@@ -37,8 +40,8 @@ invalid = []
 response.each_pair do |host,resp|
   valid = false
   resp.split("\n").each do |line|
-    if line =~ /round\-trip.*(\d+\.\d+)\/(\d+\.\d+)\/(\d+\.\d+)\/(\d+\.\d+)/
-      response[host] = $3.to_f
+    if line =~ /avg.*(\d+\.\d+)\/(\d+\.\d+)\/(\d+\.\d+)\/(\d+\.\d+)/
+      response[host] = $2.to_f
       valid = true
     end
   end
