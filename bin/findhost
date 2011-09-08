@@ -8,6 +8,9 @@ require 'rubygems'
 require 'net/ssh'
 require 'highline/import'
 
+@cachefile = File.join("#{ENV['HOME']}",".findhosts")
+@shellfile = File.join("#{ENV['HOME']}",".ssh","known_hosts")
+
 def die(message)
   STDERR.puts message
   exit(1)
@@ -18,16 +21,15 @@ username = user.ask("Username: ") { |q| q.default = ENV['USER'] }
 password = user.ask("Password: ") { |q| q.echo = false }
 
 hosts = []
-if File.exists?(File.join("#{ENV['HOME']}",".findhosts"))
-	hosts = IO.readlines(File.join("#{ENV['HOME']}",".findhosts")).map { |x| x.strip }
-elsif File.exists?("#{ENV['HOME']}",".ssh","known_hosts")
-	known_hosts = File.join("#{ENV['HOME']}",".ssh","known_hosts")
-	IO.foreach(known_hosts) do |line|
+if File.exists?(@cachefile)
+	hosts = IO.readlines(@cachefile).map { |x| x.strip }
+elsif File.exists?(@shellfile)
+	IO.foreach(@shellfile) do |line|
   	hostname = line.split(/[\, ]/).shift
   	hosts.push hostname
 	end
 else
-	die "#{known_hosts} not found" if not File.exists?(known_hosts)
+	die "No candidate known_hosts file found"
 end
 
 threads = []
@@ -71,3 +73,13 @@ STDERR.puts "OK"
 
 STDERR.puts "\n"
 puts response.map { |k,v| [k,v] }.sort { |a,b| a[1] <=> b[1] }.map { |x| x.join("\t") }.join("\n")
+
+# Save found hosts in ~/.findhosts
+prev_hosts = []
+if File.exists?(@cachefile)
+  prev_hosts = IO.readlines(@cachefile).map { |x| x.strip }
+end
+prev_hosts = [response.keys,prev_hosts].flatten.uniq
+fout = File.open(@cachefile,'w')
+fout.puts prev_hosts.join("\n")
+fout.close
