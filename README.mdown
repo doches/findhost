@@ -1,0 +1,16 @@
+`findhost` is a quick and dirty tool for finding an available remote machine on
+the local network.
+
+## Usage
+
+    $ findhost
+    Username: |user|
+    Password: xxxxxxxxxxxx
+    Pinging...OK
+    Authenticating 7 hosts...OK
+    
+    localhost	0.08
+    remote_1	0.31
+    remote_2	0.33
+    ...
+
