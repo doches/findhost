@@ -17,16 +17,21 @@ user = HighLine.new
 username = user.ask("Username: ") { |q| q.default = ENV['USER'] }
 password = user.ask("Password: ") { |q| q.echo = false }
 
-known_hosts = File.join("#{ENV['HOME']}",".ssh","known_hosts")
-die "#{known_hosts} not found" if not File.exists?(known_hosts)
-
 hosts = []
+if File.exists?(File.join("#{ENV['HOME']}",".findhosts"))
+	hosts = IO.readlines(File.join("#{ENV['HOME']}",".findhosts")).map { |x| x.strip }
+elsif File.exists?("#{ENV['HOME']}",".ssh","known_hosts")
+	known_hosts = File.join("#{ENV['HOME']}",".ssh","known_hosts")
+	IO.foreach(known_hosts) do |line|
+  	hostname = line.split(/[\, ]/).shift
+  	hosts.push hostname
+	end
+else
+	die "#{known_hosts} not found" if not File.exists?(known_hosts)
+end
+
 threads = []
 response = {}
-IO.foreach(known_hosts) do |line|
-  hostname = line.split(/[\, ]/).shift
-  hosts.push hostname
-end
 STDERR.print "Pinging #{hosts.size} hosts..."
 hosts.each do |hostname|
   threads << Thread.new(hostname) do |host|
